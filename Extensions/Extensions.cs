@@ -1,10 +1,20 @@
 ﻿namespace Extensions
 {
 	using System.Collections.Generic;
+	using System.Configuration;
 	using System.Data;
+	using System.Data.Common;
 
 	public static class Extensions
 	{
+		public static IDbConnection OpenConnection(this ConnectionStringSettings connectionSettings)
+		{
+			var provider = DbProviderFactories.GetFactory(connectionSettings.ProviderName);
+			var connection = provider.CreateConnection();
+			connection.ConnectionString = connectionSettings.ConnectionString;
+			connection.Open();
+			return connection;
+		}
 		public static IDbCommand WithCommand(
 			this IDbConnection connection, string statement, params object[] numberedArgs)
 		{
