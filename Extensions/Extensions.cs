@@ -1,16 +1,25 @@
 ﻿namespace Extensions
 {
+	using System;
 	using System.Collections.Generic;
 	using System.Configuration;
 	using System.Data;
 	using System.Data.Common;
+	using System.Dynamic;
 
 	public static class Extensions
 	{
 		public static IDbConnection OpenConnection(this ConnectionStringSettings connectionSettings)
 		{
+			if (connectionSettings == null)
+				throw new ArgumentNullException("connectionSettings");
+			
 			var provider = DbProviderFactories.GetFactory(connectionSettings.ProviderName);
 			var connection = provider.CreateConnection();
+
+			if (connection == null)
+				throw new ConfigurationErrorsException(string.Format("The connection named \"{0}\" could not be created.", connectionSettings.Name));
+	
 			connection.ConnectionString = connectionSettings.ConnectionString;
 			connection.Open();
 			return connection;
@@ -60,8 +69,37 @@
 		{
 			using (command)
 			using (var reader = command.ExecuteReader())
+			{
+				if (reader == null)
+					yield break;
+
 				while (reader.Read())
 					yield return reader;
+			}
+		}
+
+		// Credits for the dynamic reader method: https://github.com/robconery/massive
+
+		public static IEnumerable<dynamic> AndExecuteDynamicReader(this IDbCommand command)
+		{
+			using (var reader = command.ExecuteReader())
+			{
+				if (reader == null)
+					yield break;
+
+				while (reader.Read())
+					yield return ToExpando(reader);
+			}
+		}
+		private static dynamic ToExpando(IDataRecord record)
+		{
+			var e = new ExpandoObject();
+			var d = e as IDictionary<string, object>;
+
+			for (var i = 0; i < record.FieldCount; i++)
+				d.Add(record.GetName(i), DBNull.Value.Equals(record[i]) ? null : record[i]);
+
+			return e;
 		}
 	}
 }
